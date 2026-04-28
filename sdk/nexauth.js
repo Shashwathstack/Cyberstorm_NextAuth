@@ -375,6 +375,8 @@
     const closeBtn = document.getElementById("na-close");
 
     // Open / close helpers
+    let formStartTime = 0;
+
     function openModal() {
       overlay.classList.add("na-visible");
       setTimeout(() => emailInput.focus(), 280);
@@ -386,12 +388,17 @@
 
     function resetForm() {
       form.reset();
+      formStartTime = 0;
       hashPreview.style.display = "none";
       hashValue.textContent = "—";
       hideMessage();
       submitBtn.disabled = false;
       submitBtn.innerHTML = "Sign In Securely";
     }
+
+    form.addEventListener("input", () => {
+      if (!formStartTime) formStartTime = Date.now();
+    });
 
     // Show live hash preview as user types password
     let hashDebounce;
@@ -451,6 +458,7 @@
 
       const email = emailInput.value.trim();
       const rawPassword = passwordInput.value;
+      const timeToFillFormMs = formStartTime ? Date.now() - formStartTime : 0;
 
       if (!email || !rawPassword) {
         showMessage("error", "Please fill in all fields.");
@@ -493,7 +501,7 @@
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, hashedPassword, apiKey: API_KEY }),
+          body: JSON.stringify({ email, hashedPassword, apiKey: API_KEY, timeToFillFormMs }),
         });
 
         const data = await response.json().catch(() => ({}));
@@ -507,12 +515,16 @@
           submitBtn.innerHTML = "✓ Signed In";
           setTimeout(() => closeModal(), 2200);
         } else {
-          // Graceful fallback for demo / no backend
-          const msg =
-            data.message || `Server responded with ${response.status}`;
-          showMessage("error", msg);
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = "Sign In Securely";
+          const msg = data.error || data.message || `Server responded with ${response.status}`;
+          if (data.stepUp) {
+            showMessage("error", `🚨 ${msg}`);
+            submitBtn.innerHTML = "Account Locked";
+            // Intentional: keep button disabled
+          } else {
+            showMessage("error", msg);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "Sign In Securely";
+          }
         }
       } catch (networkErr) {
         // Demo mode: backend not running — simulate success

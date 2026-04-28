@@ -5,6 +5,15 @@ const jwt = require("jsonwebtoken");
 const { verifyToken } = require("../utils/jwtUtils");
 const db = require("../database/db");
 
+let sseClients = [];
+
+function broadcastEvent(type, data) {
+  const payload = `data: ${JSON.stringify({ type, data })}\n\n`;
+  sseClients.forEach((client) => {
+    try { client.write(payload); } catch (e) {}
+  });
+}
+
 // ─────────────────────────────────────────────────────────────
 // GET /auth/verify
 // Verifies a Bearer JWT token sent in the Authorization header.
@@ -73,4 +82,24 @@ router.get("/stats", (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────
+// GET /stats/live
+// Server-Sent Events endpoint for real-time dashboard updates
+// ─────────────────────────────────────────────────────────────
+router.get("/stats/live", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  // Send initial connection payload
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+
+  sseClients.push(res);
+
+  req.on("close", () => {
+    sseClients = sseClients.filter((c) => c !== res);
+  });
+});
+
 module.exports = router;
+module.exports.broadcastEvent = broadcastEvent;

@@ -4,16 +4,18 @@ const router = express.Router();
 const db = require("../database/db");
 const { hashPassword, comparePassword } = require("../utils/hashUtils");
 const { generateToken } = require("../utils/jwtUtils");
+const aiMonitor = require("../AI driven detection/aiMonitor");
+
+// Lazy require to avoid circular dependencies if tokens.js also requires auth.js
+function broadcastEvent(type, data) {
+  require("./tokens").broadcastEvent(type, data);
+}
 
 // ─────────────────────────────────────────────────────────────
 // In-memory login attempt log (shared via module reference)
 // ─────────────────────────────────────────────────────────────
 const loginAttempts = [];
 
-/**
- * Returns the shared login attempts array so index.js / stats
- * can read the same in-memory list.
- */
 function getLoginAttempts() {
   return loginAttempts;
 }
@@ -23,56 +25,29 @@ function getLoginAttempts() {
 // ─────────────────────────────────────────────────────────────
 router.post("/register", async (req, res) => {
   const { email, password, apiKey } = req.body;
-
   console.log(`📝 Register attempt: ${email}`);
 
-  // 1. Validate inputs
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Email and password are required" });
+  if (!email || !password || !apiKey) {
+    return res.status(400).json({ success: false, error: "Missing required fields" });
   }
 
-  if (!apiKey) {
-    return res
-      .status(400)
-      .json({ success: false, error: "API key is required" });
-  }
-
-  // 2. Check if email already exists
-  const existing = db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .get(email);
-
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) {
-    console.log(`⚠️  Registration failed — email already exists: ${email}`);
-    return res
-      .status(409)
-      .json({ success: false, error: "Email already exists" });
+    return res.status(409).json({ success: false, error: "Email already exists" });
   }
 
   try {
-    // 3. Double-hash: browser sent SHA-256 hash → we bcrypt it
     const hashedPassword = await hashPassword(password);
     const createdAt = new Date().toISOString();
-
-    // 4. Save to database using parameterised query (no SQL injection)
     db.prepare(
-      `INSERT INTO users (email, password, apiKey, createdAt, failedAttempts)
-       VALUES (?, ?, ?, ?, 0)`
+      `INSERT INTO users (email, password, apiKey, createdAt, failedAttempts, isLocked)
+       VALUES (?, ?, ?, ?, 0, 0)`
     ).run(email, hashedPassword, apiKey, createdAt);
 
-    console.log(`✅ User registered successfully: ${email}`);
-
-    // 5. Return success
-    return res
-      .status(201)
-      .json({ success: true, message: "User registered" });
+    return res.status(201).json({ success: true, message: "User registered" });
   } catch (err) {
     console.error("❌ Register error:", err.message);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 
@@ -80,74 +55,103 @@ router.post("/register", async (req, res) => {
 // POST /auth/login
 // ─────────────────────────────────────────────────────────────
 router.post("/login", async (req, res) => {
-  const { email, password, apiKey } = req.body;
+  // Now extracting timeToFillFormMs and hashedPassword if sent directly
+  const { email, password, hashedPassword, apiKey, timeToFillFormMs } = req.body;
+  const passToUse = hashedPassword || password; 
 
-  // Resolve real IP (respects proxy headers if present)
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
-    req.socket.remoteAddress ||
-    "unknown";
-
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket.remoteAddress || "unknown";
   console.log(`🔑 Login attempt: ${email} from IP ${ip}`);
 
-  // 1. Validate inputs
-  if (!email || !password) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Email and password are required" });
+  if (!email || !passToUse) {
+    return res.status(400).json({ success: false, error: "Email and password are required" });
   }
 
-  // 2. Find user — generic error to avoid email-enumeration attacks
-  const user = db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(email);
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
 
-  const recordAttempt = (success) => {
-    loginAttempts.push({
+  // Helper to record attempt, run AI monitor, and broadcast
+  const recordAttempt = (success, emailExists) => {
+    // 1. Run AI Engine first
+    const aiResult = aiMonitor.checkLogin(
+      { ip, headers: req.headers, body: req.body }, 
+      success, 
+      { emailExists, timeToFillFormMs, country: "US" } // mocking country as US for now
+    );
+
+    let isBlocked = false;
+    let stepUp = false;
+
+    // 2. Check if AI says to lock the account (Score > 95)
+    if (aiResult.action === 'block_and_alert' && user) {
+      db.prepare("UPDATE users SET isLocked = 1 WHERE id = ?").run(user.id);
+      console.log(`🚨 AI ENGINE LOCKDOWN: Account ${email} has been locked.`);
+      stepUp = true;
+      isBlocked = true;
+    } else if (aiResult.action === 'block' || aiResult.action === 'block_and_alert') {
+      isBlocked = true;
+    }
+
+    // 3. Record the attempt
+    const attempt = {
+      id: `l-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       email,
       ip,
-      success,
+      success: success && !isBlocked,
       timestamp: new Date().toISOString(),
-    });
-    // Keep only the last 100 attempts in memory
+      country: "US", // mock country
+      flagged: aiResult.finalScore > 50,
+      riskScore: aiResult.finalScore
+    };
+    loginAttempts.push(attempt);
     if (loginAttempts.length > 100) loginAttempts.shift();
+    
+    // Broadcast live event to Dashboard
+    broadcastEvent("newAttempt", attempt);
+
+    return { isBlocked, stepUp, aiResult };
   };
 
+  // 1. If user doesn't exist
   if (!user) {
-    // Still run bcrypt to avoid timing-based enumeration
-    await comparePassword(password, "$2b$10$invalidhashpaddingtowastetime000000");
-    recordAttempt(false);
-    console.log(`❌ Login failed — user not found (${email})`);
-    return res
-      .status(401)
-      .json({ success: false, error: "Invalid credentials" });
+    await comparePassword(passToUse, "$2b$10$invalidhashpaddingtowastetime000000");
+    const { isBlocked, stepUp } = recordAttempt(false, false);
+    if (stepUp) {
+      return res.status(403).json({ success: false, error: "Account Locked. A 2FA recovery link has been sent to your email.", stepUp: true });
+    }
+    return res.status(401).json({ success: false, error: "Invalid credentials" });
+  }
+
+  // 2. Check if account is ALREADY locked
+  if (user.isLocked === 1) {
+    recordAttempt(false, true);
+    return res.status(403).json({ success: false, error: "Account Locked. A 2FA recovery link has been sent to your email.", stepUp: true });
   }
 
   // 3. Compare password
-  const passwordMatch = await comparePassword(password, user.password);
+  const passwordMatch = await comparePassword(passToUse, user.password);
 
   if (!passwordMatch) {
-    // 4. Increment failed attempt counter
-    db.prepare(
-      "UPDATE users SET failedAttempts = failedAttempts + 1 WHERE id = ?"
-    ).run(user.id);
-
-    recordAttempt(false);
-    console.log(`❌ Login failed — wrong password for ${email}`);
-    return res
-      .status(401)
-      .json({ success: false, error: "Invalid credentials" });
+    db.prepare("UPDATE users SET failedAttempts = failedAttempts + 1 WHERE id = ?").run(user.id);
+    const { isBlocked, stepUp } = recordAttempt(false, true);
+    
+    if (stepUp) {
+      return res.status(403).json({ success: false, error: "Account Locked. A 2FA recovery link has been sent to your email.", stepUp: true });
+    }
+    return res.status(401).json({ success: false, error: "Invalid credentials" });
   }
 
-  // 5. Correct password — reset counter and issue token
-  db.prepare(
-    "UPDATE users SET failedAttempts = 0, lastLogin = ? WHERE id = ?"
-  ).run(new Date().toISOString(), user.id);
+  // 4. Password is correct. Check AI engine for blocks anyway (e.g., bot detection on valid login)
+  const { isBlocked, stepUp, aiResult } = recordAttempt(true, true);
+  
+  if (stepUp) {
+    return res.status(403).json({ success: false, error: "Account Locked due to suspicious activity. A 2FA recovery link has been sent to your email.", stepUp: true });
+  }
+  if (isBlocked) {
+    return res.status(403).json({ success: false, error: "Login blocked due to high security risk." });
+  }
 
+  // 5. Success
+  db.prepare("UPDATE users SET failedAttempts = 0, lastLogin = ? WHERE id = ?").run(new Date().toISOString(), user.id);
   const token = generateToken({ id: user.id, email: user.email });
-  recordAttempt(true);
-
-  console.log(`✅ Login successful — token issued for ${email}`);
 
   return res.json({
     success: true,

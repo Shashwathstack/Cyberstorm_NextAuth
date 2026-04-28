@@ -129,6 +129,70 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [fetchData]);
 
+  // Real-time EventSource listener
+  useEffect(() => {
+    const sse = new EventSource("http://localhost:4000/stats/live");
+    
+    sse.onmessage = (e) => {
+      const parsed = JSON.parse(e.data);
+      
+      if (parsed.type === "newAttempt") {
+        const attempt = parsed.data;
+        
+        // Formatted time
+        const timeStr = new Date(attempt.timestamp).toLocaleTimeString();
+        
+        // 1. Prepend to live logins feed
+        setLogins(prev => [{
+          id: attempt.id,
+          email: attempt.email,
+          ip: attempt.ip,
+          country: attempt.country || "🇺🇸 US",
+          time: timeStr,
+          success: attempt.success,
+          flagged: attempt.flagged
+        }, ...prev].slice(0, 10));
+
+        // 2. Prepend to threat log if flagged or blocked
+        if (attempt.flagged || !attempt.success) {
+          setThreats(prev => [{
+            id: attempt.id,
+            time: timeStr,
+            ip: attempt.ip,
+            attackType: attempt.riskScore > 90 ? "Brute Force" : "Bot Traffic",
+            country: attempt.country || "🇺🇸 US",
+            status: attempt.riskScore > 80 ? "Blocked" : "Flagged"
+          }, ...prev].slice(0, 24));
+          
+          setRiskScore(attempt.riskScore);
+        }
+
+        // 3. Increment counters visually for a real-time feel
+        setStats(prev => ({
+          ...prev,
+          loginsToday: prev.loginsToday + 1,
+          threatsBlocked: prev.threatsBlocked + (attempt.success ? 0 : 1)
+        }));
+      } else if (parsed.type === "connected") {
+        setBackendOnline(true);
+      }
+    };
+
+    sse.onerror = () => {
+      // Backend probably offline
+      setBackendOnline(false);
+      sse.close();
+      // Try to reconnect in 5s
+      setTimeout(() => {
+        if (!backendOnline) {
+          // simple way to trigger a reload or it will naturally stay off
+        }
+      }, 5000);
+    };
+
+    return () => sse.close();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* ── Top Navbar ──────────────────────────────────────────────── */}

@@ -21,9 +21,17 @@ try {
       apiKey         TEXT    NOT NULL,
       createdAt      TEXT    NOT NULL,
       failedAttempts INTEGER DEFAULT 0,
-      lastLogin      TEXT
+      lastLogin      TEXT,
+      isLocked       INTEGER DEFAULT 0
     )
   `);
+
+  // Migrate existing tables safely
+  try {
+    db.exec('ALTER TABLE users ADD COLUMN isLocked INTEGER DEFAULT 0;');
+  } catch (err) {
+    // Column likely already exists, ignore error
+  }
 
   console.log("📦 Database connected ✅");
 } catch (err) {
