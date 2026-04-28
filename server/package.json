@@ -1,0 +1,27 @@
+{
+  "name": "nexauth-server",
+  "version": "1.0.0",
+  "description": "NexAuth — plug-and-play authentication backend with AI-powered cybersecurity",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "node testBackend.js"
+  },
+  "keywords": [
+    "auth",
+    "jwt",
+    "security",
+    "nexauth"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.9.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  }
+}

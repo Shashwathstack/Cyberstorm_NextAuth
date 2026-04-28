@@ -1,6 +1,12 @@
 # Dependencies
 node_modules/
 dashboard/node_modules/
+server/node_modules/
+
+# SQLite database files (runtime data — never commit)
+server/database/*.db
+server/database/*.db-shm
+server/database/*.db-wal
 
 # Production builds
 dashboard/build/
