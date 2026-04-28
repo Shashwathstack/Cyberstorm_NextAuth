@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo Website — Powered by NexAuth</title>
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+    />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg: #020617;
+        --surface: #0f172a;
+        --border: #1e293b;
+        --accent: #6366f1;
+        --accent2: #8b5cf6;
+        --text: #f8fafc;
+        --muted: #64748b;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Inter', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ── Navbar ── */
+      nav {
+        border-bottom: 1px solid var(--border);
+        padding: 0 40px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(15,23,42,0.8);
+        backdrop-filter: blur(12px);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .nav-logo-badge {
+        width: 34px; height: 34px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .nav-badge {
+        background: rgba(99,102,241,0.15);
+        border: 1px solid rgba(99,102,241,0.3);
+        color: #818cf8;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 20px;
+        letter-spacing: 0.04em;
+      }
+
+      /* ── Hero ── */
+      .hero {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 80px 24px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::before {
+        content: '';
+        position: absolute;
+        width: 700px; height: 700px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+
+      .hero-pill {
+        background: rgba(99,102,241,0.12);
+        border: 1px solid rgba(99,102,241,0.3);
+        color: #818cf8;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 16px;
+        border-radius: 20px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 28px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      h1 {
+        font-size: clamp(36px, 6vw, 68px);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+        margin-bottom: 22px;
+        background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      h1 span {
+        background: linear-gradient(135deg, #6366f1, #a78bfa);
+        -webkit-background-clip: text;
+        background-clip: text;
+      }
+
+      .hero-sub {
+        font-size: 18px;
+        color: var(--muted);
+        max-width: 520px;
+        line-height: 1.7;
+        margin-bottom: 40px;
+      }
+
+      .hero-code-block {
+        background: #0d1117;
+        border: 1px solid #1e2d3d;
+        border-radius: 14px;
+        padding: 20px 26px;
+        font-family: 'Courier New', monospace;
+        font-size: 13.5px;
+        color: #e2e8f0;
+        text-align: left;
+        max-width: 540px;
+        width: 100%;
+        position: relative;
+        margin-bottom: 40px;
+      }
+      .code-label {
+        position: absolute;
+        top: -10px; left: 16px;
+        background: #0d1117;
+        border: 1px solid #1e2d3d;
+        border-radius: 6px;
+        padding: 2px 10px;
+        font-family: 'Inter', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .code-tag { color: #f97316; }
+      .code-attr { color: #34d399; }
+      .code-val { color: #fbbf24; }
+
+      /* ── Feature grid ── */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        max-width: 880px;
+        width: 100%;
+        margin-bottom: 48px;
+      }
+      .feature-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 20px;
+        text-align: left;
+        transition: border-color 0.2s, transform 0.2s;
+      }
+      .feature-card:hover {
+        border-color: rgba(99,102,241,0.4);
+        transform: translateY(-2px);
+      }
+      .feature-icon {
+        font-size: 22px;
+        margin-bottom: 10px;
+      }
+      .feature-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: #e2e8f0;
+      }
+      .feature-desc {
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      /* ── Integration step ── */
+      .integration {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 30px 36px;
+        max-width: 560px;
+        width: 100%;
+        text-align: left;
+      }
+      .integration h2 {
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 18px;
+        color: #e2e8f0;
+      }
+      .step {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+      .step-num {
+        width: 28px; height: 28px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .step-text { font-size: 13.5px; color: #94a3b8; line-height: 1.6; }
+      .step-text strong { color: #e2e8f0; }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 20px 40px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      /* ── Floating hash indicator ── */
+      #live-hash-display {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #0d1117;
+        border: 1px solid #1e2d3d;
+        border-radius: 12px;
+        padding: 14px 16px;
+        max-width: 300px;
+        font-size: 11px;
+        font-family: 'Inter', sans-serif;
+        display: none;
+        z-index: 9997;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        animation: slideIn 0.3s ease;
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(20px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      #live-hash-display .lhd-title {
+        color: #10b981;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #live-hash-display .lhd-label { color: #475569; font-size: 10px; margin-bottom: 3px; }
+      #live-hash-display .lhd-val {
+        color: #22d3ee;
+        font-family: monospace;
+        font-size: 10px;
+        word-break: break-all;
+        line-height: 1.5;
+        margin-bottom: 8px;
+      }
+      #live-hash-display .lhd-note {
+        color: #34d399;
+        font-size: 10.5px;
+        border-top: 1px solid #1e2d3d;
+        padding-top: 8px;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Navbar ─────────────────────────────────── -->
+    <nav>
+      <div class="nav-logo">
+        <div class="nav-logo-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L4 6v6c0 5.25 3.5 10.16 8 11.38C16.5 22.16 20 17.25 20 12V6L12 2z"
+              fill="rgba(255,255,255,0.9)"/>
+          </svg>
+        </div>
+        DemoSite
+      </div>
+      <span class="nav-badge">Powered by NexAuth</span>
+    </nav>
+
+    <!-- ── Hero ──────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-pill">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="#818cf8">
+          <circle cx="5" cy="5" r="5"/>
+        </svg>
+        One-Line Integration Demo
+      </div>
+
+      <h1>
+        Secure Auth,<br/>
+        <span>Zero Effort</span>
+      </h1>
+
+      <p class="hero-sub">
+        This page uses NexAuth with a single <code>&lt;script&gt;</code> tag.
+        Passwords are <strong>hashed in-browser</strong> with SHA-256 before
+        any network request — the raw password never leaves your device.
+      </p>
+
+      <!-- One-line integration code block -->
+      <div class="hero-code-block">
+        <span class="code-label">Your Integration (1 line)</span>
+        <span class="code-tag">&lt;script</span>
+        <span class="code-attr"> src</span>=<span class="code-val">"./nexauth.js"</span>
+        <span class="code-attr"> data-key</span>=<span class="code-val">"test-key-123"</span>
+        <span class="code-tag">&gt;&lt;/script&gt;</span>
+      </div>
+
+      <!-- Features -->
+      <div class="features">
+        <div class="feature-card">
+          <div class="feature-icon">🔐</div>
+          <div class="feature-title">SHA-256 Browser Hashing</div>
+          <div class="feature-desc">Passwords hashed using Web Crypto API. Raw password never sent.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-title">One Script Tag</div>
+          <div class="feature-desc">Drop one line of HTML. NexAuth injects everything automatically.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-title">AI Threat Detection</div>
+          <div class="feature-desc">Every login attempt is analyzed for bots, injection, and anomalies.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <div class="feature-title">Live Dashboard</div>
+          <div class="feature-desc">Real-time analytics, threat logs, and risk meters at localhost:3000.</div>
+        </div>
+      </div>
+
+      <!-- Steps -->
+      <div class="integration">
+        <h2>🚀 How Integration Works</h2>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            <strong>Add one &lt;script&gt; tag</strong> to your site with your API key.
+            NexAuth injects the login button automatically.
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            <strong>User enters credentials.</strong> NexAuth hashes the password in the
+            browser with SHA-256 (Web Crypto API) — raw password never leaves the device.
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            <strong>Only the hash is sent</strong> to your backend. AI threat detection
+            runs on every request. JWT token is returned and stored.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      &copy; 2025 NexAuth &bull; AI-Powered Authentication SDK &bull;
+      <a href="http://localhost:3000" style="color:#6366f1;text-decoration:none;">
+        Open Dashboard →
+      </a>
+    </footer>
+
+    <!-- ── Floating last-hash display ────────────────────────────── -->
+    <div id="live-hash-display">
+      <div class="lhd-title">🔐 Last Hash Proof</div>
+      <div class="lhd-label">Email</div>
+      <div class="lhd-val" id="lhd-email">—</div>
+      <div class="lhd-label">SHA-256 Hash Sent to Server</div>
+      <div class="lhd-val" id="lhd-hash">—</div>
+      <div class="lhd-note">✅ Raw password: never stored, never sent</div>
+    </div>
+
+    <!-- ── THE ONE LINE THAT ADDS NEXAUTH ────────────────────────── -->
+    <script src="./nexauth.js" data-key="test-key-123"></script>
+
+    <!-- Show floating hash proof after login -->
+    <script>
+      function checkLastHash() {
+        try {
+          const data = JSON.parse(localStorage.getItem('nexauth_last_hash') || 'null');
+          if (data) {
+            document.getElementById('lhd-email').textContent = data.email;
+            document.getElementById('lhd-hash').textContent = data.hash;
+            document.getElementById('live-hash-display').style.display = 'block';
+          }
+        } catch(e) {}
+      }
+      // Poll every second to catch fresh logins
+      setInterval(checkLastHash, 1000);
+      checkLastHash();
+    </script>
+  </body>
+</html>
