@@ -4,17 +4,17 @@ Adding NexAuth to your website is incredibly fast. You don't need to learn compl
 
 ## 1. Prerequisites
 
-Before you start, ensure that your **NexAuth server is running**. 
-You can start it by running `bash start.sh` in the terminal from the root folder of your NexAuth project.
+Before you start, ensure that your **NexAuth backend and dashboard are running**.
+You can start them using the run steps in the main README (backend on :4000 and dashboard on :3000).
 
 ## 2. The One Line of Code
 
 Copy the following script tag and paste it into the HTML of your website, ideally just before the closing `</body>` tag:
 
 ```html
-<script src="http://localhost:4000/sdk/nexauth.js" data-key="your-api-key-here"></script>
+<script src="http://localhost:3000/nexauth.js" data-key="your-api-key-here"></script>
 ```
-*(Note: If you are using NexAuth in production with Cloudflare, replace `http://localhost:4000` with your tunnel URL).*
+*(Note: In production, host the SDK at your own domain or tunnel and replace `http://localhost:3000` accordingly.)*
 
 ## 3. Configuration Options
 

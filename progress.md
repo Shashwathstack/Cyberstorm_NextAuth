@@ -15,6 +15,7 @@
   - LiveFeed component (real-time updates)
 - ✅ Responsive UI built with React, Tailwind CSS, and PostCSS
 - ✅ Demo pages created (index.html and ecommerce.html)
+- ✅ Demo is now optional by toggle
 
 ## Backend Development
 - ✅ Express.js backend server (Node.js)
@@ -25,6 +26,7 @@
 - ✅ Token management routes (/tokens endpoints)
 - ✅ Password hashing utilities (bcrypt)
 - ✅ CORS configuration for multi-domain support
+- ✅ Plug and play NexAuth link is now served along with dashboard (Removed hardcoded path)
 
 ## AI-Powered Threat Detection Engine
 - ✅ Core AI engine modules created
@@ -62,7 +64,7 @@
 - **Documentation:** Complete with integration guides and demo pages
 
 ## Team Contributions
-- Active contributors: 8+ team members
+- Active contributors: 4 team members
 - Frequent commits reflecting steady progress
 - Multiple feature branches successfully merged
 - Last commit: Support for inline SDK injection via #nexauth-container

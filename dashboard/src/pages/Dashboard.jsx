@@ -75,53 +75,109 @@ const DUMMY_STATS = () => ({
   successDelta: (randInt(-5, 12) / 10).toFixed(1),
 });
 
+const EMPTY_STATS = {
+  loginsToday: 0,
+  loginsDelta: 0,
+  threatsBlocked: 0,
+  threatsDelta: 0,
+  activeWebsites: 0,
+  websitesDelta: 0,
+  successRate: 0,
+  successDelta: 0,
+};
+
+function mapAttemptsToLogins(attempts) {
+  return attempts.slice(0, 10).map((attempt) => ({
+    id: attempt.id,
+    email: attempt.email,
+    ip: attempt.ip,
+    country: attempt.country || "US",
+    time: new Date(attempt.timestamp).toLocaleTimeString(),
+    success: attempt.success,
+    flagged: attempt.flagged,
+  }));
+}
+
+function mapAttemptsToThreats(attempts) {
+  return attempts
+    .filter((attempt) => attempt.flagged || !attempt.success)
+    .slice(0, 24)
+    .map((attempt) => ({
+      id: attempt.id,
+      time: new Date(attempt.timestamp).toLocaleTimeString(),
+      ip: attempt.ip,
+      attackType: attempt.riskScore > 90 ? "Brute Force" : "Bot Traffic",
+      country: attempt.country || "US",
+      status: attempt.riskScore > 80 ? "Blocked" : "Flagged",
+    }));
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [stats, setStats] = useState(DUMMY_STATS());
-  const [threats, setThreats] = useState(generateThreats(24));
-  const [logins, setLogins] = useState(generateLogins(10));
-  const [riskScore, setRiskScore] = useState(randInt(20, 75));
+  const [stats, setStats] = useState({ ...EMPTY_STATS });
+  const [threats, setThreats] = useState([]);
+  const [logins, setLogins] = useState([]);
+  const [riskScore, setRiskScore] = useState(0);
   const [lastFetch, setLastFetch] = useState(new Date());
   const [backendOnline, setBackendOnline] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [hasRealData, setHasRealData] = useState(false);
+
+  const applyDemoData = useCallback(() => {
+    setStats(DUMMY_STATS());
+    setThreats(generateThreats(24));
+    setLogins(generateLogins(10));
+    setRiskScore(randInt(20, 75));
+  }, []);
+
+  const applyEmptyData = useCallback(() => {
+    setStats({ ...EMPTY_STATS });
+    setThreats([]);
+    setLogins([]);
+    setRiskScore(0);
+  }, []);
+
+  const applyRealData = useCallback((data) => {
+    const attempts = Array.isArray(data.recentAttempts) ? data.recentAttempts : [];
+
+    setStats({
+      loginsToday: data.totalLogins ?? 0,
+      loginsDelta: 0,
+      threatsBlocked: data.threatsBlocked ?? 0,
+      threatsDelta: 0,
+      activeWebsites: data.activeWebsites ?? 0,
+      websitesDelta: 0,
+      successRate: data.successRate ?? 0,
+      successDelta: 0,
+    });
+    setLogins(mapAttemptsToLogins(attempts));
+    setThreats(mapAttemptsToThreats(attempts));
+    setRiskScore((prev) => (attempts[0]?.riskScore !== undefined ? attempts[0].riskScore : prev));
+    setHasRealData(true);
+  }, []);
 
   const fetchData = useCallback(async () => {
+    if (demoMode) {
+      applyDemoData();
+      setLastFetch(new Date());
+      return;
+    }
+
     try {
       const { data } = await axios.get("http://localhost:4000/stats", {
         timeout: 3000,
       });
-      setStats({
-        loginsToday: data.loginsToday ?? stats.loginsToday,
-        loginsDelta: data.loginsDelta ?? 0,
-        threatsBlocked: data.threatsBlocked ?? stats.threatsBlocked,
-        threatsDelta: data.threatsDelta ?? 0,
-        activeWebsites: data.activeWebsites ?? stats.activeWebsites,
-        websitesDelta: data.websitesDelta ?? 0,
-        successRate: data.successRate ?? stats.successRate,
-        successDelta: data.successDelta ?? 0,
-      });
-      if (data.threats) setThreats(data.threats);
-      if (data.logins) setLogins(data.logins.slice(0, 10));
-      if (data.riskScore !== undefined) setRiskScore(data.riskScore);
+      applyRealData(data);
       setBackendOnline(true);
     } catch (_) {
-      // Backend not running — refresh dummy data with slight variation
       setBackendOnline(false);
-      setStats(DUMMY_STATS());
-      setRiskScore((prev) => {
-        const delta = randInt(-6, 6);
-        return Math.max(0, Math.min(100, prev + delta));
-      });
-      // Prepend a new fake login entry
-      setLogins((prev) => {
-        const newEntry = generateLogins(1)[0];
-        newEntry.id = `l-${Date.now()}`;
-        newEntry.time = new Date().toLocaleTimeString();
-        return [newEntry, ...prev].slice(0, 10);
-      });
+      if (!hasRealData) {
+        applyEmptyData();
+      }
     }
     setLastFetch(new Date());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyDemoData, applyEmptyData, applyRealData, demoMode, hasRealData]);
 
   useEffect(() => {
     fetchData();
@@ -131,6 +187,8 @@ export default function Dashboard() {
 
   // Real-time EventSource listener
   useEffect(() => {
+    if (demoMode) return;
+
     const sse = new EventSource("http://localhost:4000/stats/live");
     
     sse.onmessage = (e) => {
@@ -173,8 +231,10 @@ export default function Dashboard() {
           loginsToday: prev.loginsToday + 1,
           threatsBlocked: prev.threatsBlocked + (attempt.success ? 0 : 1)
         }));
+        setHasRealData(true);
       } else if (parsed.type === "connected") {
         setBackendOnline(true);
+        setHasRealData(true);
       }
     };
 
@@ -191,7 +251,25 @@ export default function Dashboard() {
     };
 
     return () => sse.close();
-  }, []);
+  }, [demoMode]);
+
+  const status = demoMode
+    ? {
+        label: "Demo Mode",
+        wrapper: "bg-indigo-500/10 border-indigo-500/25 text-indigo-400",
+        dot: "bg-indigo-400",
+      }
+    : backendOnline
+    ? {
+        label: "Backend Online",
+        wrapper: "bg-emerald-500/10 border-emerald-500/25 text-emerald-400",
+        dot: "bg-emerald-400",
+      }
+    : {
+        label: "Backend Offline",
+        wrapper: "bg-yellow-500/10 border-yellow-500/25 text-yellow-400",
+        dot: "bg-yellow-400",
+      };
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -214,16 +292,22 @@ export default function Dashboard() {
 
           {/* Status row */}
           <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
-              backendOnline
-                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
-                : "bg-yellow-500/10 border-yellow-500/25 text-yellow-400"
-            }`}>
+            <button
+              onClick={() => setDemoMode((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${
+                demoMode
+                  ? "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
+                  : "bg-gray-800/60 border-gray-700 text-gray-400"
+              }`}
+            >
+              {demoMode ? "Demo On" : "Demo Off"}
+            </button>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${status.wrapper}`}>
               <span className="relative flex h-2 w-2">
-                <span className={`dot-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${backendOnline ? "bg-emerald-400" : "bg-yellow-400"}`} />
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${backendOnline ? "bg-emerald-400" : "bg-yellow-400"}`} />
+                <span className={`dot-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${status.dot}`} />
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${status.dot}`} />
               </span>
-              {backendOnline ? "Backend Online" : "Demo Mode"}
+              {status.label}
             </div>
             <span className="text-xs text-gray-600 hidden md:block">
               Last sync: {lastFetch.toLocaleTimeString()}
@@ -235,14 +319,20 @@ export default function Dashboard() {
       {/* ── Main content ────────────────────────────────────────────── */}
       <main className="flex-1 max-w-screen-xl mx-auto w-full px-6 py-8 flex flex-col gap-6">
 
-        {/* Demo mode banner */}
-        {!backendOnline && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-300">
-            <span className="text-base">💡</span>
+        {/* Demo / offline banners */}
+        {demoMode && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs text-indigo-300">
+            <span className="text-base">🧪</span>
             <span>
-              <strong>Demo Mode</strong> — Backend at{" "}
-              <code className="font-mono bg-gray-800 px-1.5 py-0.5 rounded">localhost:4000</code>{" "}
-              is offline. Showing live-updating dummy data. All features are functional.
+              <strong>Demo Mode Enabled</strong> — Showing simulated data.
+            </span>
+          </div>
+        )}
+        {!demoMode && !backendOnline && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-300">
+            <span className="text-base">⚠️</span>
+            <span>
+              <strong>Backend Offline</strong> — {hasRealData ? "Showing last known data." : "No data yet."}
             </span>
           </div>
         )}

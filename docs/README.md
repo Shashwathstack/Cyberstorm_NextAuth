@@ -40,7 +40,7 @@ Getting started with NexAuth is easy. Follow these steps:
 You can add NexAuth to any website simply by pasting this one line of code right before the closing `</body>` tag:
 
 ```html
-<script src="../sdk/nexauth.js" data-key="your-api-key-here"></script>
+<script src="http://localhost:3000/nexauth.js" data-key="your-api-key-here"></script>
 ```
 
 ## Tech Stack
