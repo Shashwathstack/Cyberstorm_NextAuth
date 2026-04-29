@@ -15,6 +15,10 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());           // Allow any origin (plug-and-play SDK)
 app.use(express.json());   // Parse JSON request bodies
 
+const path = require("path");
+// Host the SDK file so any website can use it via <script src="http://localhost:4000/sdk/nexauth.js">
+app.use("/sdk", express.static(path.join(__dirname, "../sdk")));
+
 // ─────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────
